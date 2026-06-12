@@ -1,0 +1,97 @@
+# nt.toml — site config for the New Theory inference API on an SO-101 rig.
+#
+# What this file is
+# -----------------
+# A per-machine config that tells run.py how to reach your SO-101 arm and your
+# two USB cameras. The starter loads it at startup; without it, run.py exits
+# with a clear error.
+#
+# Copy this file to ~/.config/nt/nt.toml and fill in your values:
+#   uv run python3 run.py setup            # auto-detects what it can
+# or by hand:
+#   mkdir -p ~/.config/nt
+#   cp conf/nt.toml.example ~/.config/nt/nt.toml
+#
+# What consumes it
+# ----------------
+# run.py calls _load_site_config('~/.config/nt/nt.toml') at startup. The arm
+# serial port and the two camera entries are read in from_config(); a missing
+# port or a missing camera prints a clear error and exits before any hardware
+# is touched.
+#
+# The SO-101 is pure joint-space — no depth cameras, no intrinsics, no
+# extrinsics, no quaternions. This file is therefore much simpler than the
+# Trossen WidowX one: a serial port and two webcam indices, nothing more.
+#
+# Camera ID naming is load-bearing
+# --------------------------------
+# The strings "top" and "side" are the camera keys the so101 inference server
+# names. They set the order frames are presented to the model — they are not
+# display names. Keep them exactly as shown; only fill in the device indices.
+#
+# Both cameras are declared `required: []` server-side, which means a missing
+# camera is zero-filled on the server with a DegradationWarning rather than a
+# hard connection close. The model was trained with BOTH views, so motion
+# quality degrades if one is absent — configure both for real runs.
+#
+# Which view is "top" vs "side"?
+# ------------------------------
+# This is the one honest open question. The live so101 contract names the
+# cameras `top` and `side` but does not pin down the exact mount geometry the
+# fine-tune was trained with. Mount one camera looking down at the workspace
+# (top) and one looking across it (side), matching the training rig as closely
+# as you can. If motion looks confused after a smoke run, try swapping the two
+# `index_or_path` values (not the ids). The smoke (README §Troubleshooting)
+# records the working assignment.
+#
+# Finding your SO-101 serial port
+# -------------------------------
+# The SO-101 connects over USB and appears as a serial device:
+#
+#   - Linux:  ls /dev/ttyACM*        (usually /dev/ttyACM0)
+#   - macOS:  ls /dev/tty.usbmodem*  (e.g. /dev/tty.usbmodem58FA0822421)
+#
+# If more than one device appears, unplug the arm, re-run the command, and note
+# which entry disappeared — that is the arm. `uv run python3 run.py setup`
+# auto-fills this when exactly one candidate is present.
+#
+# Finding your camera indices
+# ---------------------------
+# USB webcams are addressed by an integer index. 0 is usually the built-in
+# camera (laptops); your external webcams are typically 1 and 2. On Linux you
+# can also use a device path, e.g. index_or_path = "/dev/video0".
+#
+# To probe indices without opening a camera permission dialog repeatedly, plug
+# the cameras in one at a time and note the index each takes, or consult your OS
+# camera settings. (We deliberately do NOT auto-open camera devices during
+# `run.py setup` — that would trigger permission prompts.)
+#
+# Calibration
+# -----------
+# The SO-101 is NOT factory-calibrated. Before the first run, calibrate once:
+#
+#   lerobot-calibrate --robot.type=so101_follower --robot.port=<port> --robot.id=<arm-id>
+#
+# where <arm-id> matches the `id` field below. See README §Calibration.
+
+[robot_config]
+# Optional: when more than one arm is configured, set `arm = "<id>"` here (or
+# pass --arm <id> on the CLI) to choose one. With a single arm, omit it.
+
+[[robot_config.arms]]
+id   = "so101_a"           # also names the lerobot calibration file
+port = "/dev/ttyACM0"      # Linux; macOS looks like /dev/tty.usbmodem*
+
+[[camera_config.cameras]]
+id            = "top"
+index_or_path = 1          # integer index or a device path like "/dev/video1"
+width         = 640
+height        = 480
+fps           = 30
+
+[[camera_config.cameras]]
+id            = "side"
+index_or_path = 2
+width         = 640
+height        = 480
+fps           = 30

@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# scripts/setup — thin shim around scripts/setup.py
+#
+# Uses `uv run` so the project's venv is on PATH. If `uv` isn't available,
+# falls back to plain `python3`. setup.py uses only the stdlib, so the system
+# python3 works fine here too.
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PY="$SCRIPT_DIR/setup.py"
+
+if command -v uv >/dev/null 2>&1; then
+  exec uv run python3 "$PY" "$@"
+else
+  exec python3 "$PY" "$@"
+fi
