@@ -1,0 +1,31 @@
+[project]
+name = "newt-starter-so101"
+version = "0.1.0"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+    "newt @ git+ssh://git@github.com/new-theory-research/newt-python.git",
+    "lerobot @ git+ssh://git@github.com/new-theory-research/lerobot-nt.git@50168c2a16dd4c67275f9918bf327c1513380061",
+    "numpy>=1.26",
+    "opencv-python-headless",
+]
+
+[project.optional-dependencies]
+# Install with: uv sync --extra hardware
+# Required on the physical rig to talk to the SO-101's Feetech servos.
+# Platform-uniform — no RealSense, so no macOS wheel gap (unlike the Trossen kit).
+hardware = [
+    "lerobot[feetech] @ git+ssh://git@github.com/new-theory-research/lerobot-nt.git@50168c2a16dd4c67275f9918bf327c1513380061",
+]
+
+[dependency-groups]
+dev = ["pytest>=8.0"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]
