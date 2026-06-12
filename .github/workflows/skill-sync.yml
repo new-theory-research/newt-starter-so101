@@ -1,0 +1,99 @@
+name: Skill sync
+
+# ── Brief-243-cont-a sync contract: verify newt-onboarding SKILL.md matches canonical ──
+# Installs newt and checks that .claude/skills/newt-onboarding/SKILL.md is
+# derived from the canonical copy in the newt package data.
+# Hardware-specific sections (<!-- hardware-specific-start/end -->) are excluded
+# from the comparison — intentional per-starter substitutions don't trigger a
+# false failure.
+#
+# Private-dep secret required:
+#   NEWT_PYTHON_DEPLOY_KEY  — read access to new-theory-research/newt-python
+#
+# Set with:
+#   gh secret set NEWT_PYTHON_DEPLOY_KEY --repo new-theory-research/newt-starter-so101 < <key-file>
+# ─────────────────────────────────────────────────────────────────────────────
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+  schedule:
+    - cron: '0 0 * * 1'  # weekly, Mondays 00:00 UTC — bit-rot probe
+  workflow_dispatch:
+
+jobs:
+  skill-sync:
+    name: Skill sync check
+    runs-on: ubuntu-latest
+    env:
+      UV_PYTHON: "3.11"
+
+    steps:
+      - name: Require private-dep secret
+        run: |
+          if [ -z "$NEWT_PYTHON_DEPLOY_KEY" ]; then
+            echo "::error title=Missing secret::NEWT_PYTHON_DEPLOY_KEY not set"
+            echo ""
+            echo "This workflow installs newt from the private repo:"
+            echo "  newt @ git+ssh://git@github.com/new-theory-research/newt-python.git"
+            echo ""
+            echo "Generate a read-only deploy key for new-theory-research/newt-python"
+            echo "(key comment MUST be git@github.com:new-theory-research/newt-python.git),"
+            echo "then: gh secret set NEWT_PYTHON_DEPLOY_KEY --repo new-theory-research/newt-starter-so101 < <key-file>"
+            exit 1
+          fi
+          echo "Secret present: NEWT_PYTHON_DEPLOY_KEY (len=${#NEWT_PYTHON_DEPLOY_KEY})"
+        env:
+          NEWT_PYTHON_DEPLOY_KEY: ${{ secrets.NEWT_PYTHON_DEPLOY_KEY }}
+
+      - uses: actions/checkout@v4
+
+      - name: Set up SSH for newt-python
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.NEWT_PYTHON_DEPLOY_KEY }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install newt (skill-sync only — skips lerobot-nt and hardware deps)
+        # uv sync would pull lerobot-nt (requires a second deploy key).
+        # The sync check only needs the newt package data (SKILL.md + importlib.resources).
+        # Create an isolated venv with just newt so importlib.resources resolves correctly.
+        run: |
+          uv venv .venv-skill-sync
+          uv pip install --python .venv-skill-sync/bin/python \
+            "git+ssh://git@github.com/new-theory-research/newt-python.git"
+
+      - name: Skill sync check — starter SKILL.md matches canonical in newt package
+        # Fails loud with a unified diff if content has diverged outside the
+        # hardware-specific section.
+        run: .venv-skill-sync/bin/python .github/scripts/check_skill_sync.py
+
+  notify-on-failure:
+    name: Notify — file/update GitHub issue on cron red
+    needs: [skill-sync]
+    if: failure() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Report failure via GitHub issue
+        run: |
+          TITLE="[skill-sync] SKILL.md diverged from canonical"
+          DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          BODY="Weekly skill-sync probe failed at ${DATE}.\n\n**Run:** ${RUN_URL}\n**Trigger:** ${{ github.event_name }}\n\nThe starter .claude/skills/newt-onboarding/SKILL.md has diverged from the canonical in newt-python.\nSync the starter copy from newt-python/src/newt/skills/newt-onboarding/SKILL.md."
+
+          EXISTING=$(gh issue list --repo "${{ github.repository }}" --state open --json number,title \
+            --jq '.[] | select(.title == "'"${TITLE}"'") | .number' | head -1)
+
+          if [ -n "$EXISTING" ]; then
+            printf '%b' "$BODY" | gh issue comment "$EXISTING" --repo "${{ github.repository }}" --body-file -
+          else
+            printf '%b' "$BODY" | gh issue create --repo "${{ github.repository }}" --title "${TITLE}" --body-file -
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

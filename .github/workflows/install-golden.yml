@@ -1,0 +1,171 @@
+name: Install golden
+
+# ── Brief-264 (pattern from brief-241): starter install golden on both platforms ─
+# Guards the documented README install sequence on both macOS and Linux.
+# Every push and PR runs clone → uv sync → uv run pytest → uv sync --extra hardware
+# on BOTH runners. A red check blocks the merge and names the failing platform and
+# step.
+#
+# SO-101 vs Trossen WidowX: the SO-101 is platform-uniform — Feetech servos, plain
+# USB webcams, no Intel RealSense. So there is NO sys_platform marker to test and NO
+# macOS wheel gap. `uv sync --extra hardware` installs the same on both platforms;
+# the marker-assert step from the Trossen kit is replaced with a single feetech
+# presence check.
+#
+# Private-dep secrets required — two GitHub deploy keys (one per private repo):
+#   NEWT_PYTHON_DEPLOY_KEY  — read access to new-theory-research/newt-python
+#   LEROBOT_DEPLOY_KEY      — read access to new-theory-research/lerobot-nt
+#                             (our vendored mirror of the research team's lerobot;
+#                             pinned to 50168c2a — the same SHA the Trossen kit pins)
+#
+# Set them with:
+#   gh secret set NEWT_PYTHON_DEPLOY_KEY --repo new-theory-research/newt-starter-so101 < <key-file>
+#   gh secret set LEROBOT_DEPLOY_KEY --repo new-theory-research/newt-starter-so101 < <key-file>
+#
+# Full secrets setup guide (key generation + multi-key routing): the brief-241 card
+# review.md in the portal repo — wiki/briefs/cards/brief-241-starter-install-golden-ci/.
+# ─────────────────────────────────────────────────────────────────────────────────
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+  schedule:
+    - cron: '0 0 * * 1'  # weekly, Mondays 00:00 UTC — bit-rot probe
+  workflow_dispatch:       # manual trigger — lets you test the cron-red + issue-filing path
+
+jobs:
+  install-golden:
+    name: Install golden (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false  # let both legs finish so we know which platform(s) broke
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+    env:
+      # Pin uv to the README's documented floor (Python 3.11+). Without this,
+      # uv grabs the runner's newest CPython — macos-latest ships 3.14, and
+      # torch has no cp314 wheels, so uv sync fails before install.
+      # uv auto-downloads 3.11 if the runner doesn't have it.
+      UV_PYTHON: "3.11"
+
+    steps:
+      - name: Require private-dep secrets
+        # Fail loud before any SSH step — missing secrets exit non-zero with instructions.
+        # A missing key is an explicit red, not a silent skip.
+        run: |
+          MISSING=""
+          if [ -z "$NEWT_PYTHON_DEPLOY_KEY" ]; then
+            MISSING="${MISSING} NEWT_PYTHON_DEPLOY_KEY"
+          fi
+          if [ -z "$LEROBOT_DEPLOY_KEY" ]; then
+            MISSING="${MISSING} LEROBOT_DEPLOY_KEY"
+          fi
+          if [ -n "$MISSING" ]; then
+            echo "::error title=Missing secrets::Required secrets not set:${MISSING}"
+            echo ""
+            echo "This workflow resolves private git+ssh dependencies:"
+            echo "  newt    @ git+ssh://git@github.com/new-theory-research/newt-python.git"
+            echo "  lerobot @ git+ssh://git@github.com/new-theory-research/lerobot-nt.git@50168c2a"
+            echo ""
+            echo "Generate a read-only deploy key for each private repo (key comment MUST be"
+            echo "the repo SSH URL, e.g. git@github.com:new-theory-research/lerobot-nt.git,"
+            echo "so webfactory/ssh-agent can route multiple deploy keys), then:"
+            echo "  gh secret set NEWT_PYTHON_DEPLOY_KEY --repo new-theory-research/newt-starter-so101 < <newt-python-key>"
+            echo "  gh secret set LEROBOT_DEPLOY_KEY --repo new-theory-research/newt-starter-so101 < <lerobot-key>"
+            echo ""
+            echo "Full instructions in the brief-241 card review.md (portal repo)."
+            exit 1
+          fi
+          echo "Secrets present: NEWT_PYTHON_DEPLOY_KEY (len=${#NEWT_PYTHON_DEPLOY_KEY}), LEROBOT_DEPLOY_KEY (len=${#LEROBOT_DEPLOY_KEY})"
+        env:
+          NEWT_PYTHON_DEPLOY_KEY: ${{ secrets.NEWT_PYTHON_DEPLOY_KEY }}
+          LEROBOT_DEPLOY_KEY: ${{ secrets.LEROBOT_DEPLOY_KEY }}
+
+      - uses: actions/checkout@v4
+
+      - name: Set up SSH for private deps (newt-python + lerobot-nt)
+        # webfactory/ssh-agent supports multiple keys as a multiline block.
+        # With multiple GitHub deploy keys, each key's comment must be the repo's
+        # SSH URL — the action uses it to route the right key to the right repo.
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: |
+            ${{ secrets.NEWT_PYTHON_DEPLOY_KEY }}
+            ${{ secrets.LEROBOT_DEPLOY_KEY }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install base deps — uv sync (README documented path)
+        run: uv sync
+
+      - name: Hardware-free test suite — uv run pytest tests/
+        # The string goldens run WITHOUT the [hardware] extra — they mock the lazy
+        # hardware globals and subprocess-invoke run.py. Running them right after the
+        # base `uv sync` proves the hardware-free guarantee: clone → uv sync → green
+        # tests on a runner with no arm, no servos, no API key.
+        run: uv run pytest tests/ -v
+
+      - name: Install hardware extra — uv sync --extra hardware (README documented path)
+        # SO-101 hardware is platform-uniform: lerobot[feetech] (Feetech servo SDK)
+        # + plain USB webcams. No RealSense, no sys_platform marker, no macOS wheel gap.
+        run: uv sync --extra hardware
+
+      - name: Assert hardware extra resolved — feetech servo SDK present
+        # lerobot[feetech] pulls feetech-servo-sdk on BOTH platforms (no marker to
+        # gate it). Asserting its presence proves the [hardware] extra actually
+        # installed, rather than just that `uv sync --extra hardware` exited 0.
+        run: |
+          uv run python -c "import importlib.metadata; v=importlib.metadata.version('feetech-servo-sdk'); print(f'feetech-servo-sdk {v}: present (correct on all platforms)')"
+
+      - name: Skill sync check — starter SKILL.md matches canonical in newt package
+        # Verifies .claude/skills/newt-onboarding/SKILL.md is derived from the
+        # canonical in the installed newt package. Hardware-specific sections
+        # (<!-- hardware-specific-start/end -->) are excluded from the comparison.
+        # Fails loud with a unified diff if content has diverged.
+        run: uv run python .github/scripts/check_skill_sync.py
+
+      - name: Install verification — offline imports
+        # run.py --check has four stages: config → api-key → registry → inference.
+        # NT_API_KEY is not wired as a repo secret; the api-key/registry stages
+        # require it (registry round-trip + Modal cold-start). So CI verifies only
+        # that core packages import cleanly offline; the full `run.py --check` runs
+        # at the developer's terminal with NT_API_KEY set.
+        # lerobot is intentionally excluded from the import smoke — it pulls heavy
+        # hardware modules; run.py imports it lazily for exactly this reason.
+        run: |
+          uv run python -c "import newt; import numpy; import cv2; print('offline imports: newt + numpy + cv2 OK')"
+
+  notify-on-failure:
+    name: Notify — file/update GitHub issue on cron red
+    needs: [install-golden]
+    # Issue-filing is the cron (+ manual) leg only — PR/push checks are already loud.
+    # Don't file on push/PR red; the failed check is sufficient signal there.
+    if: failure() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Report failure via GitHub issue
+        run: |
+          TITLE="[install-golden] starter install failing"
+          DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          BODY="Weekly install golden probe failed at ${DATE}.\n\n**Run:** ${RUN_URL}\n**Trigger:** ${{ github.event_name }}\n\nSee the run for which platform(s) (macOS / Linux) are failing and which step.\n\n**Anti-pattern note:** if secrets are not yet wired, this is expected — set NEWT_PYTHON_DEPLOY_KEY + LEROBOT_DEPLOY_KEY per the brief-241 card review.md (portal repo)."
+
+          # Dedup: add a comment on the existing open issue rather than filing a new one.
+          # --repo required: notify job has no checkout, so gh can't infer the repo from .git/
+          EXISTING=$(gh issue list --repo "${{ github.repository }}" --state open --json number,title \
+            --jq '.[] | select(.title == "'"${TITLE}"'") | .number' | head -1)
+
+          if [ -n "$EXISTING" ]; then
+            echo "Appending run failure to existing issue #${EXISTING}"
+            printf '%b' "$BODY" | gh issue comment "$EXISTING" --repo "${{ github.repository }}" --body-file -
+          else
+            echo "Filing new issue: ${TITLE}"
+            printf '%b' "$BODY" | gh issue create --repo "${{ github.repository }}" --title "${TITLE}" --body-file -
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
