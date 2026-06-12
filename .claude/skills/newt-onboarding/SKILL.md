@@ -1,6 +1,6 @@
 ---
 name: newt-onboarding
-description: Walk a developer through the New Theory golden path — install → login → models → Robot() → fixture inference → hardware setup. Invoke when asked to "get me set up", "walk me through onboarding", or "help me get started with newt".
+description: Walk a developer through the New Theory golden path — install → login → models → Robot() → snapshot inference → hardware setup. Invoke when asked to "get me set up", "walk me through onboarding", or "help me get started with newt".
 ---
 
 <!-- canonical source: newt-python/src/newt/skills/newt-onboarding/SKILL.md — edit there only; this copy is derived and verified by CI -->
@@ -68,23 +68,23 @@ uv run python -c "from newt import Robot; print(Robot())"
 
 ---
 
-## Milestone 2 — fixture inference (test call)
+## Milestone 2 — snapshot inference (test call)
 
 **This is a test call against a recorded observation. Nothing moves. No robot is connected.**
 
-`fixtures.load()` replays a saved camera-and-state snapshot. This is the understanding step — you explore the response shape before wiring any hardware.
+`snapshots.load()` replays a saved camera-and-state snapshot. This is the understanding step — you explore the response shape before wiring any hardware.
 
 ```python
-from newt import Robot, fixtures
+from newt import Robot, snapshots
 
 robot = Robot()
-obs = fixtures.load("cup_stacking")
+obs = snapshots.load("cup_stacking")
 response = robot.infer(obs)
 print(response)
 # action_chunk (50, 8): x, y, z, qw, qx, qy, qz, gripper | latency 261ms
 ```
 
-`fixtures.available()` lists all bundled recordings.
+`snapshots.available()` lists all bundled recordings.
 
 The response:
 
@@ -122,7 +122,7 @@ You've confirmed the API works. To drive a real robot:
 3. **Run the hardware check.**
 
    ```bash
-   python run.py --check
+   python3 run.py --check
    ```
 
    This verifies your config and hardware connectivity before any inference runs.
