@@ -87,7 +87,7 @@ def _import_hardware_deps() -> None:
 # Source: brief-251 closeout + brief-258c — cameras ["top", "side"], required:[]
 # (a missing camera is zero-filled server-side with a DegradationWarning, not a
 # hard close). The order here is the order images are presented to the model.
-_CAMERA_KEYS = ["top", "side"]
+_CAMERA_KEYS = ["up", "side"]  # demo: 10K fine-tune contract (was ["top","side"])
 
 # Canonical 6-DOF joint order — load-bearing for the model's state/action
 # encoder. This is lerobot's SO101Follower motor order by construction, which is
@@ -109,7 +109,7 @@ _JOINT_ORDER = [
 # Two cameras at 3x378x378 uint8 is ~857 KB on the wire, under the websockets
 # 1 MiB default; sending native 640x480 (~1.77 MB) would exceed it and the
 # server would tear down the connection mid-send. Source: brief-258c contract.
-_IMAGE_SIZE = 378
+_IMAGE_SIZE = 224  # demo: 10K fine-tune contract (was 378)
 
 # ACTION_INTERVAL_S: per-action cadence while streaming a chunk. 15 fps is the
 # common lerobot teleop/eval cadence; the exact fps the so101 fine-tune expects

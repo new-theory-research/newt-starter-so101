@@ -60,7 +60,7 @@ import embodiment as _embodiment_mod
 # tags ["so101", "so-101"], UID ft_6341c5_d13da9. We pass the embodiment-led tag;
 # the SDK resolves it to the fine-tune. The `nt` library picks the model — the
 # tag is the stable handle, not a user-facing model choice.
-MODEL = "so101"
+MODEL = "so101-pickplace-10k"  # demo: the overnight fine-tune (was "so101")
 
 # Wall-clock cap for one trial. Matches the newt.Robot.run default; a single
 # trial, no N>1 loop. Defined here (not in embodiment.py) — it's a run-policy
