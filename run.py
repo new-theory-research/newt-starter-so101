@@ -69,7 +69,7 @@ MAX_DURATION_S: float = 30.0
 
 # SO-101 / MolmoAct2 is OPEN-VOCABULARY (language-conditioned): --task takes any
 # natural-language instruction. There is NO fixed task-key list (unlike the
-# Trossen nt0-fp3 starter, which inlined trained keys). The live registry is the
+# Trossen starter, which inlined trained keys). The live registry is the
 # source of truth for what the fine-tune was trained on; --check performs the
 # registry round-trip. We do not invent trained-task keys here. The prompts below
 # are ILLUSTRATIVE examples to adapt to your scene — not a claimed trained set.
