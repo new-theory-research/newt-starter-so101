@@ -1,6 +1,6 @@
 """Hardware-free task interface tests (brief-255 pattern, SO-101 port).
 
-The Trossen nt0-fp3 starter inlined 13 fixed task keys and validated --task
+The Trossen starter inlined 13 fixed task keys and validated --task
 against them. SO-101 / MolmoAct2 is OPEN-VOCABULARY (language-conditioned):
 --task takes any natural-language instruction and there is no fixed key list to
 validate against. So the goldens here are different in kind:
