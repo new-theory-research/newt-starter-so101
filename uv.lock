@@ -1026,7 +1026,7 @@ wheels = [
 [[package]]
 name = "newt"
 version = "0.0.3"
-source = { git = "ssh://git@github.com/new-theory-research/newt-python.git#db32a2442400bfa00b63322b0c345e2a707763fa" }
+source = { git = "ssh://git@github.com/new-theory-research/newt-python.git#c8b9ae9f991960ea3a10d338c6dd5c4469580cc9" }
 dependencies = [
     { name = "httpx" },
     { name = "msgpack" },
