@@ -10,19 +10,8 @@ The SO-101 is a $200 arm: the lowest barrier to entry in the lineup. This kit ta
 - **2 USB webcams** — one looking down at the workspace (`top`), one looking across it (`side`)
 - **newt CLI** — installed globally: `uv tool install "git+ssh://git@github.com/new-theory-research/newt-python.git"`. If you followed [Getting started](https://newtheory-docs.vercel.app/docs/getting-started), you have this.
 - **NT API key** — set as `NT_API_KEY` in your environment, or stored via `newt login`
-- **SSH key registered with the `new-theory-research` GitHub org** — the starter pulls `newt` and `lerobot` from private repos over SSH (`git+ssh://`), so `uv sync` needs a working SSH key. Test with `ssh -T git@github.com`. (No SSH key? See below for the HTTPS path.)
+- **SSH key on a GitHub account with access to the `new-theory-research` org** (access is by invitation from New Theory) — the starter pulls `newt` and `lerobot` from private repos over SSH (`git+ssh://`), so `uv sync` needs a working SSH key. Test with `ssh -T git@github.com`.
 - **Python 3.11–3.13** and [uv](https://docs.astral.sh/uv/getting-started/installation/) installed (a `.python-version` file pins 3.12 — uv handles this automatically). Python 3.14+ is not supported yet (the torch wall).
-
-### No SSH key?
-
-If your machine authenticates to GitHub over HTTPS only (e.g. via `gh auth`), `uv sync` will fail because the deps use `git+ssh://`. Two commands rewrite those URLs to HTTPS:
-
-```bash
-gh auth setup-git
-git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
-```
-
-`gh auth setup-git` registers the GitHub CLI as your HTTPS credential helper. The `insteadOf` line rewrites the `ssh://git@github.com/` prefix that uv passes to git for every `git+ssh://git@github.com/...` dep. After both commands, `uv sync` resolves via HTTPS and authenticates with your existing `gh` session.
 
 ### macOS works out of the box
 
@@ -189,7 +178,7 @@ fps           = 30
 
 **`uv sync` fails with authentication errors**
 
-Test SSH access before syncing: `ssh -T git@github.com` should print `Hi <username>! You've successfully authenticated`. If it fails, your key isn't registered with the `new-theory-research` org — verify the key is listed under your GitHub account settings, and ask your New Theory contact to confirm you're a collaborator on `newt-python` and `lerobot-nt`. Or use the HTTPS path above.
+Test SSH access before syncing: `ssh -T git@github.com` should print `Hi <username>! You've successfully authenticated`. If it fails, your key isn't registered with the `new-theory-research` org — verify the key is listed under your GitHub account settings, and ask your New Theory contact to confirm you're a collaborator on `newt-python` and `lerobot-nt`.
 
 **Can't find the serial port**
 
